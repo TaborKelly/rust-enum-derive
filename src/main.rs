@@ -43,7 +43,7 @@ fn parse_options() -> Args {
     opts.optopt("", "name", "the enum name (Name if not specified)", "NAME");
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("", "enum", "parse C enum input instead of #define");
-    opts.optflag("a", "all", "implment all of the traits (equivalent to \
+    opts.optflag("a", "all", "implement all of the traits (equivalent to \
                  --display --fromprimative --fromstr)");
     opts.optflag("", "default", "implement the Default trait with the first \
                  value");

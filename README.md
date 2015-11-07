@@ -28,7 +28,9 @@ enum net_device_flags {
 	IFF_ECHO			= 1<<18, /* __volatile__ */
 };
 ```
+
 and generate the following code:
+
 ```rust
 pub enum Name {
     IFF_UP = 0x1,
@@ -336,6 +338,32 @@ impl Name {
     }
 }
 ```
+
 The first and last lines of the above C enum example are ignored. So you can
 simply rust-enum-derive a file full of lines formatted as NAME = VALUE if you
 prefer.
+
+You can choose to implement all, some, or none of the methods/traits.
+
+## Usage
+
+```
+Usage: ./rust-enum-derive <options>
+Crudely converts C #defines into Rust enums.
+
+Options:
+    -i, --input NAME    input file name (stdin if not specified)
+    -o, --output NAME   output file name (stdout if not specified)
+        --name NAME     the enum name (Name if not specified)
+    -h, --help          print this help menu
+        --enum          parse C enum input instead of #define
+    -a, --all           implement all of the traits (equivalent to --display
+                        --fromprimative --fromstr)
+        --default       implement the Default trait with the first value
+        --display       implement the std::fmt::Display trait
+        --fromprimative
+                        implement the num::traits::FromPrimitive trait
+        --fromstr       implement the std::str::FromStr trait
+        --hex           hexadecimal output
+        --pretty_fmt    implement pretty_fmt()
+```

@@ -1,6 +1,6 @@
 [package]
-name = "c-define-to-rust-enum"
-version = "0.1.0"
+name = "rust-enum-derive"
+version = "0.1.1"
 authors = ["Tabor Kelly <taborkelly+github@gmail.com>"]
 
 [dependencies]
