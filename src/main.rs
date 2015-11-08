@@ -19,7 +19,7 @@ struct Args {
     input: Option<String>,
     output: Option<String>,
     name: String,
-    c_enum: bool,
+    define: bool,
     default: bool,
     display: bool,
     fromstr: bool,
@@ -42,7 +42,7 @@ fn parse_options() -> Args {
     opts.optopt("o", "output", "output file name (stdout if not specified)", "NAME");
     opts.optopt("", "name", "the enum name (Name if not specified)", "NAME");
     opts.optflag("h", "help", "print this help menu");
-    opts.optflag("", "enum", "parse C enum input instead of #define");
+    opts.optflag("", "define", "parse C #define input instead of enum");
     opts.optflag("a", "all", "implement all of the traits (equivalent to \
                  --display --fromprimative --fromstr)");
     opts.optflag("", "default", "implement the Default trait with the first \
@@ -65,7 +65,7 @@ fn parse_options() -> Args {
     let name = matches.opt_str("name");
     // apply default name
     a.name = name.unwrap_or(String::from("Name"));
-    a.c_enum = matches.opt_present("enum");
+    a.define = matches.opt_present("define");
     a.default = matches.opt_present("default");
     a.display = matches.opt_present("display");
     a.fromprimative = matches.opt_present("fromprimative");
@@ -89,7 +89,7 @@ fn parse_options() -> Args {
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} <options>\n\
-                        Crudely converts C #defines into Rust enums.",
+                        Crudely converts C enums (or #defines) into Rust enums.",
                         program);
     print!("{}", opts.usage(&brief));
 }
@@ -155,11 +155,11 @@ fn get_input(args: &Args) -> Vec<CEnum> {
             // remove this unwrap as soon as expect is stabalized
             let f = File::open(s).unwrap();
             let r = BufReader::new(f);
-            parse_buff(r, args.c_enum)
+            parse_buff(r, !args.define)
         }
         None => {
             let r = BufReader::new(std::io::stdin());
-            parse_buff(r, args.c_enum)
+            parse_buff(r, !args.define)
         }
     }
 }
@@ -337,7 +337,7 @@ fn main() {
 
     let vi = get_input(&args);
     if vi.len() < 1 {
-        println!("Error: couldn't parse any input. Try turning --enum off/on.");
+        println!("Error: couldn't parse any input. Try turning --define off/on.");
         return;
     }
     let mut w = write_factory(&args);

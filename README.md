@@ -1,9 +1,63 @@
 # rust-enum-derive
 
 rust-enum-derive is a simple program for generating rust enums and associated
-traits from text files. To make it easy to copy and paste these text files are
-allowed to look like C enums or C #defines. For example, rust-enum-derive can
-take the following text file (linux/if.h):
+traits from text files. To simplify converting C code these text files are
+allowed to look like C enums or C #defines.
+
+## Usage
+```
+Usage: ./rust-enum-derive <options>
+Crudely converts C enums (or #defines) into Rust enums.
+Options:
+    -i, --input NAME    input file name (stdin if not specified)
+    -o, --output NAME   output file name (stdout if not specified)
+        --name NAME     the enum name (Name if not specified)
+    -h, --help          print this help menu
+        --define        parse C #define input instead of enum
+    -a, --all           implement all of the traits (equivalent to --display
+                        --fromprimative --fromstr)
+        --default       implement the Default trait with the first value
+        --display       implement the std::fmt::Display trait
+        --fromprimative
+                        implement the num::traits::FromPrimitive trait
+        --fromstr       implement the std::str::FromStr trait
+        --hex           hexadecimal output
+        --pretty_fmt    implement pretty_fmt()
+```
+
+## Simple examples
+All of the following examples produce the same code:
+
+```
+ZERO = 0,
+ONE = 1,
+TWO = 2,
+```
+
+```
+ZERO,
+ONE,
+TWO,
+```
+
+```
+#define ZERO 0
+#define ONE 1
+#define TWO 2
+```
+
+This is the rust enum that will result:
+
+```
+pub enum Name {
+    ZERO = 0,
+    ONE = 1,
+    TWO = 2,
+}
+```
+
+## Complex example
+For example, rust-enum-derive can take the following text file (linux/if.h):
 
 ```
 enum net_device_flags {
@@ -339,31 +393,5 @@ impl Name {
 }
 ```
 
-The first and last lines of the above C enum example are ignored. So you can
-simply rust-enum-derive a file full of lines formatted as NAME = VALUE if you
-prefer.
-
-You can choose to implement all, some, or none of the methods/traits.
-
-## Usage
-
-```
-Usage: ./rust-enum-derive <options>
-Crudely converts C #defines into Rust enums.
-
-Options:
-    -i, --input NAME    input file name (stdin if not specified)
-    -o, --output NAME   output file name (stdout if not specified)
-        --name NAME     the enum name (Name if not specified)
-    -h, --help          print this help menu
-        --enum          parse C enum input instead of #define
-    -a, --all           implement all of the traits (equivalent to --display
-                        --fromprimative --fromstr)
-        --default       implement the Default trait with the first value
-        --display       implement the std::fmt::Display trait
-        --fromprimative
-                        implement the num::traits::FromPrimitive trait
-        --fromstr       implement the std::str::FromStr trait
-        --hex           hexadecimal output
-        --pretty_fmt    implement pretty_fmt()
-```
+You can choose to have rust-enum-derive implement all, some, or none of the
+methods/traits.
