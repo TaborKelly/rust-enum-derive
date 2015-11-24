@@ -1,5 +1,5 @@
 [root]
-name = "rust-enum-derive"
+name = "enum-derive"
 version = "0.2.0"
 dependencies = [
  "env_logger 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
