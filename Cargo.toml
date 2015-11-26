@@ -2,6 +2,7 @@
 name = "enum-derive"
 version = "0.2.0"
 authors = ["Tabor Kelly <taborkelly+github@gmail.com>"]
+license = "Apache-2.0/BSD-3-Clause-Clear/MIT"
 
 [dependencies]
 getopts = "0.2"
