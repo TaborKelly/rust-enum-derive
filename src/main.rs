@@ -89,7 +89,8 @@ fn parse_options() -> Args {
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} <options>\n\
-                        Crudely converts C enums (or #defines) into Rust enums.",
+                        A simple program for generating rust enums and \
+                        associated traits from text files.",
                         program);
     print!("{}", opts.usage(&brief));
 }

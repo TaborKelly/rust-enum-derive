@@ -6,8 +6,8 @@ allowed to look like C enums or C #defines.
 
 ## Usage
 ```
-Usage: ./rust-enum-derive <options>
-Crudely converts C enums (or #defines) into Rust enums.
+Usage: ./enum-derive <options>
+A simple program for generating rust enums and associated traits from text files.
 Options:
     -i, --input NAME    input file name (stdin if not specified)
     -o, --output NAME   output file name (stdout if not specified)

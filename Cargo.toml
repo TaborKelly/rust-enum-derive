@@ -1,8 +1,10 @@
 [package]
 name = "enum-derive"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Tabor Kelly <taborkelly+github@gmail.com>"]
 license = "Apache-2.0/BSD-3-Clause-Clear/MIT"
+description = "A simple program for generating rust enums and associated traits from text files."
+homepage = "https://github.com/TaborKelly/rust-enum-derive"
 
 [dependencies]
 getopts = "0.2"
