@@ -6,7 +6,7 @@ allowed to look like C enums or C #defines.
 
 ## Usage
 ```
-Usage: ./enum-derive <options>
+Usage: ./rust-enum-derive <options>
 A simple program for generating rust enums and associated traits from text files.
 Options:
     -i, --input NAME    input file name (stdin if not specified)
