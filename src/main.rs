@@ -3,12 +3,12 @@ use std::env;
 use getopts::Options;
 use std::cmp::Ordering;
 use std::io::{Write, BufRead, BufReader, BufWriter};
-use std::fs::{File, OpenOptions};
+use std::fs::{self, DirEntry, File, OpenOptions};
+use std::path::{Path, PathBuf};
 
 #[macro_use]
 extern crate log;
 extern crate env_logger; // TODO: replace
-
 extern crate regex;
 
 // TODO: add more tests
@@ -17,7 +17,9 @@ extern crate regex;
 #[derive(Default)]
 struct Args {
     input: Option<String>,
+    input_dir: Option<String>,
     output: Option<String>,
+    output_dir: Option<String>,
     name: String,
     define: bool,
     default: bool,
@@ -39,7 +41,9 @@ fn parse_options() -> Args {
 
     let mut opts = Options::new();
     opts.optopt("i", "input", "input file name (stdin if not specified)", "NAME");
-    opts.optopt("o", "output", "output file name (stdout if not specified)", "NAME");
+    opts.optopt("", "input_dir", "input directory to traverse", "NAME");
+    opts.optopt("o", "output", "output directory to traverse", "NAME");
+    opts.optopt("", "output_dir", "output file name (stdout if not specified)", "NAME");
     opts.optopt("", "name", "the enum name (Name if not specified)", "NAME");
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("", "define", "parse C #define input instead of enum");
@@ -61,7 +65,9 @@ fn parse_options() -> Args {
         std::process::exit(0);
     }
     a.input = matches.opt_str("i");
+    a.input_dir = matches.opt_str("input_dir");
     a.output = matches.opt_str("o");
+    a.output_dir = matches.opt_str("output_dir");
     let name = matches.opt_str("name");
     // apply default name
     a.name = name.unwrap_or(String::from("Name"));
@@ -82,6 +88,21 @@ fn parse_options() -> Args {
         a.fromprimative = true;
         a.fromstr = true;
         a.pretty_fmt = true;
+    }
+
+    if a.input.is_some() && a.input_dir.is_some() {
+        println!("ERROR: using --input and --input_dir at the same time \
+                  doesn't make sense!");
+        std::process::exit(1);
+    }
+    if a.output.is_some() && a.output_dir.is_some() {
+        println!("ERROR: using --output and --output_dir at the same time \
+                  doesn't make sense!");
+        std::process::exit(1);
+    }
+    if a.input_dir.is_some() && a.output_dir.is_none() {
+        println!("ERROR: if you use --input_dir you must use --output_dir!");
+        std::process::exit(1);
     }
 
     a
@@ -323,6 +344,38 @@ fn write_factory(args: &Args) -> Box<Write> {
     }
 }
 
+fn traverse_dir(base_input_dir: PathBuf) -> ::std::io::Result<()>{
+    println!("traverse_dir({})", base_input_dir.display());
+    let dir = base_input_dir;
+
+    // TODO: revisit. This follows symlinks, is that what we want?
+    // If no we could use fs::symlink_metadata() treats symbolic links as
+    // files, or DirEntry::file_type() which returns a FileType which we could
+    // use to tell if this was a symbolic link or not?
+    if fs::metadata(&dir).unwrap().is_dir() {
+        println!("{} is a directory", dir.display());
+        for entry in try!(fs::read_dir(dir)) {
+            let entry = try!(entry);
+            if fs::metadata(entry.path()).unwrap().is_dir() {
+                try!(traverse_dir(entry.path()));
+            } else {
+                let path = entry.path();
+                println!("{:?} is a file", path);
+                if path.extension().is_some() {
+                    let extension = path.extension().unwrap();
+                    let extension = extension.to_string_lossy();
+                    let extension = extension.to_lowercase();
+                    if extension == "toml" {
+                        println!("found one! path = {}", path.display());
+                    }
+                }
+
+            }
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     env_logger::init().unwrap();
     let args: Args = parse_options();
@@ -336,18 +389,28 @@ fn main() {
     if args.fromprimative { fov.push(Box::new(FormatOutputFromPrimative)); }
     if args.pretty_fmt { fov.push(Box::new(FormatOutputPrettyFmt)); }
 
-    let vi = get_input(&args);
-    if vi.len() < 1 {
-        println!("Error: couldn't parse any input. Try turning --define off/on.");
-        return;
-    }
-    let mut w = write_factory(&args);
-
-    for vw in fov {
-        match vw.write(&mut w, &args.name, args.hex, &vi)
+    if args.input_dir.is_some() {
+        let pb = PathBuf::from(args.input_dir.as_ref().unwrap());
+        match traverse_dir(pb)
         {
             Err(e) => println!("Error: {}", e),
             _ => ()
+        }
+    }
+    else {
+        let vi = get_input(&args);
+        if vi.len() < 1 {
+            println!("Error: couldn't parse any input. Try turning --define off/on.");
+            return;
+        }
+        let mut w = write_factory(&args);
+
+        for vw in fov {
+            match vw.write(&mut w, &args.name, args.hex, &vi)
+            {
+                Err(e) => println!("Error: {}", e),
+                _ => ()
+            }
         }
     }
 }
