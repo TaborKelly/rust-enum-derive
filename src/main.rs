@@ -4,7 +4,7 @@ use std::env;
 use getopts::Options;
 use std::cmp::Ordering;
 use std::io::prelude::*;
-use std::io::{BufReader, BufWriter, ErrorKind};
+use std::io::{BufReader, BufWriter, Error, ErrorKind};
 use std::fs::{self, File, OpenOptions};
 use std::path::PathBuf;
 
@@ -365,9 +365,9 @@ macro_rules! get_key_string {
             let $v = $t.get(stringify!($v)).unwrap();
             let $v = $v.as_str();
             if $v.is_none() {
-                return Err(::std::io::Error::new(ErrorKind::Other,
-                                                 format!("{} wasn't available as str",
-                                                         stringify!($v))))
+                return Err(Error::new(ErrorKind::Other,
+                                      format!("{} wasn't available as str",
+                                              stringify!($v))))
             }
             let $v = $v.unwrap();
             $a.$v = String::from($v);
@@ -382,9 +382,9 @@ macro_rules! get_key_bool {
             let $v = $t.get(stringify!($v)).unwrap();
             let $v = $v.as_bool();
             if $v.is_none() {
-                return Err(::std::io::Error::new(ErrorKind::Other,
-                                                 format!("{} wasn't available as bool",
-                                                         stringify!($v))))
+                return Err(Error::new(ErrorKind::Other,
+                                      format!("{} wasn't available as bool",
+                                              stringify!($v))))
             }
             $a.$v = $v.unwrap();
         }
@@ -400,22 +400,22 @@ fn parse_toml(path: &PathBuf) -> ::std::io::Result<FileArgs>
     try!(f.read_to_string(&mut s));
     let table = toml::Parser::new(&s).parse();
     if table.is_none() {
-        return Err(::std::io::Error::new(ErrorKind::Other,
-                                         format!("failed to parse {}", path.display())))
+        return Err(Error::new(ErrorKind::Other,
+                              format!("failed to parse {}", path.display())))
     }
     let table = table.unwrap();
 
     let rust_enum_derive = table.get("rust-enum-derive");
     if rust_enum_derive.is_none() {
-        return Err(::std::io::Error::new(ErrorKind::Other,
-                                         format!("couldn't find a rust-enum-derive table in {}",
-                                                  path.display())))
+        return Err(Error::new(ErrorKind::Other,
+                              format!("couldn't find a rust-enum-derive table in {}",
+                                      path.display())))
     }
     let rust_enum_derive = rust_enum_derive.unwrap();
     let rust_enum_derive = rust_enum_derive.as_table();
     if rust_enum_derive.is_none() {
-        return Err(::std::io::Error::new(ErrorKind::Other,
-                                         format!("rust-enum-derive wasn't a table")))
+        return Err(Error::new(ErrorKind::Other,
+                              format!("rust-enum-derive wasn't a table")))
     }
     let rust_enum_derive = rust_enum_derive.unwrap();
 
@@ -447,9 +447,9 @@ fn process(file_path_in: Option<&PathBuf>, file_path_out: Option<&PathBuf>,
             Some(pb) => pb.to_string_lossy().into_owned(),
             None => String::from("standard in"),
         };
-        return Err(::std::io::Error::new(ErrorKind::Other,
-                                         format!("couldn't parse any input from {}.",
-                                                 input)))
+        return Err(Error::new(ErrorKind::Other,
+                              format!("couldn't parse any input from {}.",
+                                      input)))
     }
 
     let mut w = try!(write_factory(file_path_out));
@@ -472,8 +472,8 @@ fn traverse_dir(base_input_dir: &PathBuf,
     dir.push(sub_dir);
 
     if !fs::metadata(&dir).unwrap().is_dir() {
-        return Err(::std::io::Error::new(ErrorKind::Other,
-                                         format!("{} is not a directory", dir.display())))
+        return Err(Error::new(ErrorKind::Other,
+                              format!("{} is not a directory", dir.display())))
     }
 
     // TODO: revisit. This follows symlinks, is that what we want?
