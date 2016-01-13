@@ -4,10 +4,9 @@ use std::env;
 use getopts::Options;
 use std::cmp::Ordering;
 use std::io::prelude::*;
-use std::io::{BufReader, BufWriter, Error, ErrorKind, Result};
+use std::io::{BufReader, BufWriter, ErrorKind};
 use std::fs::{self, File, OpenOptions};
 use std::path::PathBuf;
-use toml::Value;
 
 #[macro_use]
 extern crate log;
@@ -183,8 +182,8 @@ fn parse_buff<T: BufRead>(read: T, parse_enum: bool) -> Vec<CEnum> {
     v
 }
 
-fn get_input(args: &Args, file_args: &FileArgs) -> Vec<CEnum> {
-    match args.input {
+fn get_input(file_path: Option<&PathBuf>, file_args: &FileArgs) -> Vec<CEnum> {
+    match file_path {
         Some(ref s) => {
             // remove this unwrap as soon as expect is stabalized
             let f = File::open(s).unwrap();
@@ -337,9 +336,11 @@ impl FormatOutput for FormatOutputEnum {
     }
 }
 
-fn write_factory(args: &Args) -> Box<Write> {
-    match args.output {
-        Some(ref s) => {
+// TODO: return result
+fn write_factory(file_path: Option<&PathBuf>) -> Box<Write> {
+    match file_path {
+        Some(s) => {
+            std::fs::create_dir_all(s.parent().unwrap()).unwrap();
             let f = OpenOptions::new().write(true)
                                       .create(true)
                                       .truncate(true)
@@ -396,7 +397,6 @@ macro_rules! get_key_bool {
 fn parse_toml(path: &PathBuf) -> ::std::io::Result<FileArgs>
 {
     let mut fa = FileArgs::default();
-    println!("path = {}", path.display());
     let mut f = try!(File::open(&path));
 
     let mut s = String::new();
@@ -434,6 +434,32 @@ fn parse_toml(path: &PathBuf) -> ::std::io::Result<FileArgs>
     Ok(fa)
 }
 
+fn process(file_path_in: PathBuf, file_path_out: PathBuf,
+           file_args: &FileArgs) -> ::std::io::Result<()> {
+    let mut fov: Vec<Box<FormatOutput>> = Vec::new();
+    fov.push(Box::new(FormatOutputEnum));
+    if file_args.fromstr { fov.push(Box::new(FormatOutputFromStr)); }
+    if file_args.default { fov.push(Box::new(FormatOutputDefault)); }
+    if file_args.display { fov.push(Box::new(FormatOutputDisplay)); }
+    if file_args.fromprimative { fov.push(Box::new(FormatOutputFromPrimative)); }
+    if file_args.pretty_fmt { fov.push(Box::new(FormatOutputPrettyFmt)); }
+
+    let vi = get_input(Some(&file_path_in), &file_args);
+    if vi.len() < 1 {
+        return Err(::std::io::Error::new(ErrorKind::Other,
+                                         format!("couldn't parse any input from {}.",
+                                                 file_path_in.display())))
+    }
+
+    let mut w = write_factory(Some(&file_path_out));
+
+    for vw in fov {
+        try!(vw.write(&mut w, &file_args.name, file_args.hex, &vi));
+    }
+
+    Ok(())
+}
+
 fn traverse_dir(base_input_dir: &PathBuf,
                 base_output_dir: &PathBuf,
                 sub_dir: &PathBuf) -> ::std::io::Result<()>{
@@ -469,6 +495,27 @@ fn traverse_dir(base_input_dir: &PathBuf,
                 if extension == "toml" {
                     let args = try!(parse_toml(&path));
                     println!("args = {:?}", args);
+
+                    let path = entry.path();
+                    println!("path = {}", path.display());
+                    let base = path.file_stem().unwrap();
+                    println!("base = {}", base.to_string_lossy());
+
+                    let mut input_file_path = PathBuf::new();
+                    input_file_path.push(base_input_dir);
+                    input_file_path.push(sub_dir);
+                    input_file_path.push(base);
+                    input_file_path.set_extension("in");
+                    println!("input_file_path = {}", input_file_path.display());
+
+                    let mut output_file_path = PathBuf::new();
+                    output_file_path.push(base_output_dir);
+                    output_file_path.push(sub_dir);
+                    output_file_path.push(base);
+                    output_file_path.set_extension("rs");
+                    println!("output_file_path = {}", output_file_path.display());
+
+                    try!(process(input_file_path, output_file_path, &args));
                 }
             }
         }
@@ -500,12 +547,32 @@ fn main() {
         }
     }
     else {
-        let vi = get_input(&args, &file_args);
+        // TODO: revisit. Is there a better way to do this?
+        let file_path_in = match args.input {
+            Some(ref s) => Some(PathBuf::from(s)),
+            None => None,
+        };
+        let file_path_in_ref = match file_path_in {
+            Some(ref fp) => Some(fp),
+            None => None,
+        };
+
+        let vi = get_input(file_path_in_ref, &file_args);
         if vi.len() < 1 {
             println!("Error: couldn't parse any input. Try turning --define off/on.");
             return;
         }
-        let mut w = write_factory(&args);
+
+        // TODO: revisit. Is there a better way to do this?
+        let file_path_out = match args.output {
+            Some(ref s) => Some(PathBuf::from(s)),
+            None => None,
+        };
+        let file_path_out_ref = match file_path_out {
+            Some(ref fp) => Some(fp),
+            None => None,
+        };
+        let mut w = write_factory(file_path_out_ref);
 
         for vw in fov {
             match vw.write(&mut w, &file_args.name, file_args.hex, &vi)
