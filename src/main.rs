@@ -336,23 +336,20 @@ impl FormatOutput for FormatOutputEnum {
     }
 }
 
-// TODO: return result
-fn write_factory(file_path: Option<&PathBuf>) -> Box<Write> {
+fn write_factory(file_path: Option<&PathBuf>) -> ::std::io::Result<Box<Write>> {
     match file_path {
         Some(s) => {
-            std::fs::create_dir_all(s.parent().unwrap()).unwrap();
-            let f = OpenOptions::new().write(true)
-                                      .create(true)
-                                      .truncate(true)
-                                      // remove this unwrap as soon as expect
-                                      // is stabalized
-                                      .open(s).unwrap();
+            try!(std::fs::create_dir_all(s.parent().unwrap()));
+            let f = try!(OpenOptions::new().write(true)
+                                           .create(true)
+                                           .truncate(true)
+                                           .open(s));
             let w = BufWriter::new(f);
-            Box::new(w)
+            Ok(Box::new(w))
         }
         None => {
             let w = BufWriter::new(std::io::stdout());
-            Box::new(w)
+            Ok(Box::new(w))
         }
     }
 }
@@ -451,7 +448,7 @@ fn process(file_path_in: PathBuf, file_path_out: PathBuf,
                                                  file_path_in.display())))
     }
 
-    let mut w = write_factory(Some(&file_path_out));
+    let mut w = try!(write_factory(Some(&file_path_out)));
 
     for vw in fov {
         try!(vw.write(&mut w, &file_args.name, file_args.hex, &vi));
@@ -572,7 +569,7 @@ fn main() {
             Some(ref fp) => Some(fp),
             None => None,
         };
-        let mut w = write_factory(file_path_out_ref);
+        let mut w = write_factory(file_path_out_ref).unwrap();
 
         for vw in fov {
             match vw.write(&mut w, &file_args.name, file_args.hex, &vi)
