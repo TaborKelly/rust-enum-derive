@@ -464,9 +464,6 @@ fn process(file_path_in: Option<&PathBuf>, file_path_out: Option<&PathBuf>,
 fn traverse_dir(base_input_dir: &PathBuf,
                 base_output_dir: &PathBuf,
                 sub_dir: &PathBuf) -> Result<()>{
-    println!("traverse_dir('{}', '{}', '{}')", base_input_dir.display(),
-              base_output_dir.display(), sub_dir.display());
-
     let mut dir = PathBuf::new();
     dir.push(base_input_dir);
     dir.push(sub_dir);
@@ -495,26 +492,21 @@ fn traverse_dir(base_input_dir: &PathBuf,
                 let extension = extension.to_lowercase();
                 if extension == "toml" {
                     let args = try!(parse_toml(&path));
-                    println!("args = {:?}", args);
 
                     let path = entry.path();
-                    println!("path = {}", path.display());
                     let base = path.file_stem().unwrap();
-                    println!("base = {}", base.to_string_lossy());
 
                     let mut input_file_path = PathBuf::new();
                     input_file_path.push(base_input_dir);
                     input_file_path.push(sub_dir);
                     input_file_path.push(base);
                     input_file_path.set_extension("in");
-                    println!("input_file_path = {}", input_file_path.display());
 
                     let mut output_file_path = PathBuf::new();
                     output_file_path.push(base_output_dir);
                     output_file_path.push(sub_dir);
                     output_file_path.push(base);
                     output_file_path.set_extension("rs");
-                    println!("output_file_path = {}", output_file_path.display());
 
                     try!(process(Some(&input_file_path), Some(&output_file_path), &args));
                 }
