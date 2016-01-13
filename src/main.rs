@@ -1,10 +1,13 @@
 extern crate getopts;
+extern crate toml;
 use std::env;
 use getopts::Options;
 use std::cmp::Ordering;
-use std::io::{Write, BufRead, BufReader, BufWriter};
-use std::fs::{self, DirEntry, File, OpenOptions};
-use std::path::{Path, PathBuf};
+use std::io::prelude::*;
+use std::io::{BufReader, BufWriter, Error, ErrorKind, Result};
+use std::fs::{self, File, OpenOptions};
+use std::path::PathBuf;
+use toml::Value;
 
 #[macro_use]
 extern crate log;
@@ -13,13 +16,15 @@ extern crate regex;
 
 // TODO: add more tests
 
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Args {
     input: Option<String>,
     input_dir: Option<String>,
     output: Option<String>,
     output_dir: Option<String>,
+}
+#[derive(Debug)]
+struct FileArgs {
     name: String,
     define: bool,
     default: bool,
@@ -29,15 +34,22 @@ struct Args {
     hex: bool,
     pretty_fmt: bool,
 }
-
+impl Default for FileArgs {
+    fn default() -> FileArgs
+    {
+        FileArgs{ name: String::from("Name"), define: false, default: false, display: false,
+                  fromstr: false, fromprimative: false, hex: false, pretty_fmt: false }
+    }
+}
 trait FormatOutput {
     fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> ::std::io::Result<()>;
 }
 
-fn parse_options() -> Args {
+fn parse_options() -> (Args, FileArgs) {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
     let mut a = Args::default();
+    let mut fa = FileArgs::default();
 
     let mut opts = Options::new();
     opts.optopt("i", "input", "input file name (stdin if not specified)", "NAME");
@@ -70,24 +82,24 @@ fn parse_options() -> Args {
     a.output_dir = matches.opt_str("output_dir");
     let name = matches.opt_str("name");
     // apply default name
-    a.name = name.unwrap_or(String::from("Name"));
-    a.define = matches.opt_present("define");
-    a.default = matches.opt_present("default");
-    a.display = matches.opt_present("display");
-    a.fromprimative = matches.opt_present("fromprimative");
-    a.pretty_fmt = matches.opt_present("pretty_fmt");
-    if a.pretty_fmt {
-        a.fromprimative = true;
-        a.display = true;
+    fa.name = name.unwrap_or(String::from("Name"));
+    fa.define = matches.opt_present("define");
+    fa.default = matches.opt_present("default");
+    fa.display = matches.opt_present("display");
+    fa.fromprimative = matches.opt_present("fromprimative");
+    fa.pretty_fmt = matches.opt_present("pretty_fmt");
+    if fa.pretty_fmt {
+        fa.fromprimative = true;
+        fa.display = true;
     }
-    a.fromstr = matches.opt_present("fromstr");
-    a.hex = matches.opt_present("hex");
+    fa.fromstr = matches.opt_present("fromstr");
+    fa.hex = matches.opt_present("hex");
     if matches.opt_present("all") {
-        a.default = true;
-        a.display = true;
-        a.fromprimative = true;
-        a.fromstr = true;
-        a.pretty_fmt = true;
+        fa.default = true;
+        fa.display = true;
+        fa.fromprimative = true;
+        fa.fromstr = true;
+        fa.pretty_fmt = true;
     }
 
     if a.input.is_some() && a.input_dir.is_some() {
@@ -105,7 +117,7 @@ fn parse_options() -> Args {
         std::process::exit(1);
     }
 
-    a
+    (a, fa)
 }
 
 fn print_usage(program: &str, opts: Options) {
@@ -171,17 +183,17 @@ fn parse_buff<T: BufRead>(read: T, parse_enum: bool) -> Vec<CEnum> {
     v
 }
 
-fn get_input(args: &Args) -> Vec<CEnum> {
+fn get_input(args: &Args, file_args: &FileArgs) -> Vec<CEnum> {
     match args.input {
         Some(ref s) => {
             // remove this unwrap as soon as expect is stabalized
             let f = File::open(s).unwrap();
             let r = BufReader::new(f);
-            parse_buff(r, !args.define)
+            parse_buff(r, !file_args.define)
         }
         None => {
             let r = BufReader::new(std::io::stdin());
-            parse_buff(r, !args.define)
+            parse_buff(r, !file_args.define)
         }
     }
 }
@@ -344,61 +356,151 @@ fn write_factory(args: &Args) -> Box<Write> {
     }
 }
 
-fn traverse_dir(base_input_dir: PathBuf) -> ::std::io::Result<()>{
-    println!("traverse_dir({})", base_input_dir.display());
-    let dir = base_input_dir;
+// A macro to retrieve an str element from a toml::Table
+// $t - Table to lookup in
+// $a - FileArgs struct
+// $v - the value in the FileArgs struct that we are assigning to,
+//      also the name to look for in the toml
+macro_rules! get_key_string {
+    ($t:ident, $a:ident, $v:ident) => {
+        if $t.contains_key(stringify!($v)) {
+            let $v = $t.get(stringify!($v)).unwrap();
+            let $v = $v.as_str();
+            if $v.is_none() {
+                return Err(::std::io::Error::new(ErrorKind::Other,
+                                                 format!("{} wasn't available as str",
+                                                         stringify!($v))))
+            }
+            let $v = $v.unwrap();
+            $a.$v = String::from($v);
+        }
+    }
+}
+
+// same as get_key_bool, except for bool instead of str/string
+macro_rules! get_key_bool {
+    ($t:ident, $a:ident, $v:ident) => {
+        if $t.contains_key(stringify!($v)) {
+            let $v = $t.get(stringify!($v)).unwrap();
+            let $v = $v.as_bool();
+            if $v.is_none() {
+                return Err(::std::io::Error::new(ErrorKind::Other,
+                                                 format!("{} wasn't available as bool",
+                                                         stringify!($v))))
+            }
+            $a.$v = $v.unwrap();
+        }
+    }
+}
+
+fn parse_toml(path: &PathBuf) -> ::std::io::Result<FileArgs>
+{
+    let mut fa = FileArgs::default();
+    println!("path = {}", path.display());
+    let mut f = try!(File::open(&path));
+
+    let mut s = String::new();
+    try!(f.read_to_string(&mut s));
+    let table = toml::Parser::new(&s).parse();
+    if table.is_none() {
+        return Err(::std::io::Error::new(ErrorKind::Other,
+                                         format!("failed to parse {}", path.display())))
+    }
+    let table = table.unwrap();
+
+    let rust_enum_derive = table.get("rust-enum-derive");
+    if rust_enum_derive.is_none() {
+        return Err(::std::io::Error::new(ErrorKind::Other,
+                                         format!("couldn't find a rust-enum-derive table in {}",
+                                                  path.display())))
+    }
+    let rust_enum_derive = rust_enum_derive.unwrap();
+    let rust_enum_derive = rust_enum_derive.as_table();
+    if rust_enum_derive.is_none() {
+        return Err(::std::io::Error::new(ErrorKind::Other,
+                                         format!("rust-enum-derive wasn't a table")))
+    }
+    let rust_enum_derive = rust_enum_derive.unwrap();
+
+    get_key_string!(rust_enum_derive, fa, name);
+    get_key_bool!(rust_enum_derive, fa, define);
+    get_key_bool!(rust_enum_derive, fa, default);
+    get_key_bool!(rust_enum_derive, fa, display);
+    get_key_bool!(rust_enum_derive, fa, fromstr);
+    get_key_bool!(rust_enum_derive, fa, fromprimative);
+    get_key_bool!(rust_enum_derive, fa, hex);
+    get_key_bool!(rust_enum_derive, fa, pretty_fmt);
+
+    Ok(fa)
+}
+
+fn traverse_dir(base_input_dir: &PathBuf,
+                base_output_dir: &PathBuf,
+                sub_dir: &PathBuf) -> ::std::io::Result<()>{
+    println!("traverse_dir('{}', '{}', '{}')", base_input_dir.display(),
+              base_output_dir.display(), sub_dir.display());
+
+    let mut dir = PathBuf::new();
+    dir.push(base_input_dir);
+    dir.push(sub_dir);
+
+    if !fs::metadata(&dir).unwrap().is_dir() {
+        return Err(::std::io::Error::new(ErrorKind::Other,
+                                         format!("{} is not a directory", dir.display())))
+    }
 
     // TODO: revisit. This follows symlinks, is that what we want?
     // If no we could use fs::symlink_metadata() treats symbolic links as
     // files, or DirEntry::file_type() which returns a FileType which we could
     // use to tell if this was a symbolic link or not?
-    if fs::metadata(&dir).unwrap().is_dir() {
-        println!("{} is a directory", dir.display());
-        for entry in try!(fs::read_dir(dir)) {
-            let entry = try!(entry);
-            if fs::metadata(entry.path()).unwrap().is_dir() {
-                try!(traverse_dir(entry.path()));
-            } else {
-                let path = entry.path();
-                println!("{:?} is a file", path);
-                if path.extension().is_some() {
-                    let extension = path.extension().unwrap();
-                    let extension = extension.to_string_lossy();
-                    let extension = extension.to_lowercase();
-                    if extension == "toml" {
-                        println!("found one! path = {}", path.display());
-                    }
+    for entry in try!(fs::read_dir(dir)) {
+        let entry = try!(entry);
+        if fs::metadata(entry.path()).unwrap().is_dir() {
+            let mut new_sub_dir = PathBuf::new();
+            new_sub_dir.push(sub_dir);
+            new_sub_dir.push(entry.file_name());
+            try!(traverse_dir(base_input_dir, base_output_dir, &new_sub_dir));
+        } else {
+            let path = entry.path();
+            if path.extension().is_some() {
+                let extension = path.extension().unwrap();
+                let extension = extension.to_string_lossy();
+                let extension = extension.to_lowercase();
+                if extension == "toml" {
+                    let args = try!(parse_toml(&path));
+                    println!("args = {:?}", args);
                 }
-
             }
         }
-    }
+    } // for entry in try!(fs::read_dir(dir))
+
     Ok(())
 }
 
 fn main() {
     env_logger::init().unwrap();
-    let args: Args = parse_options();
+    let (args, file_args) = parse_options();
     debug!("args = {:?}", args);
 
     let mut fov: Vec<Box<FormatOutput>> = Vec::new();
     fov.push(Box::new(FormatOutputEnum));
-    if args.fromstr { fov.push(Box::new(FormatOutputFromStr)); }
-    if args.default { fov.push(Box::new(FormatOutputDefault)); }
-    if args.display { fov.push(Box::new(FormatOutputDisplay)); }
-    if args.fromprimative { fov.push(Box::new(FormatOutputFromPrimative)); }
-    if args.pretty_fmt { fov.push(Box::new(FormatOutputPrettyFmt)); }
+    if file_args.fromstr { fov.push(Box::new(FormatOutputFromStr)); }
+    if file_args.default { fov.push(Box::new(FormatOutputDefault)); }
+    if file_args.display { fov.push(Box::new(FormatOutputDisplay)); }
+    if file_args.fromprimative { fov.push(Box::new(FormatOutputFromPrimative)); }
+    if file_args.pretty_fmt { fov.push(Box::new(FormatOutputPrettyFmt)); }
 
     if args.input_dir.is_some() {
-        let pb = PathBuf::from(args.input_dir.as_ref().unwrap());
-        match traverse_dir(pb)
+        let input_dir = PathBuf::from(args.input_dir.as_ref().unwrap());
+        let output_dir = PathBuf::from(args.output_dir.as_ref().unwrap());
+        match traverse_dir(&input_dir, &output_dir, &PathBuf::new())
         {
             Err(e) => println!("Error: {}", e),
             _ => ()
         }
     }
     else {
-        let vi = get_input(&args);
+        let vi = get_input(&args, &file_args);
         if vi.len() < 1 {
             println!("Error: couldn't parse any input. Try turning --define off/on.");
             return;
@@ -406,7 +508,7 @@ fn main() {
         let mut w = write_factory(&args);
 
         for vw in fov {
-            match vw.write(&mut w, &args.name, args.hex, &vi)
+            match vw.write(&mut w, &file_args.name, file_args.hex, &vi)
             {
                 Err(e) => println!("Error: {}", e),
                 _ => ()
