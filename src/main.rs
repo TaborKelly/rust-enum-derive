@@ -431,7 +431,7 @@ fn parse_toml(path: &PathBuf) -> ::std::io::Result<FileArgs>
     Ok(fa)
 }
 
-fn process(file_path_in: PathBuf, file_path_out: PathBuf,
+fn process(file_path_in: Option<&PathBuf>, file_path_out: Option<&PathBuf>,
            file_args: &FileArgs) -> ::std::io::Result<()> {
     let mut fov: Vec<Box<FormatOutput>> = Vec::new();
     fov.push(Box::new(FormatOutputEnum));
@@ -441,14 +441,18 @@ fn process(file_path_in: PathBuf, file_path_out: PathBuf,
     if file_args.fromprimative { fov.push(Box::new(FormatOutputFromPrimative)); }
     if file_args.pretty_fmt { fov.push(Box::new(FormatOutputPrettyFmt)); }
 
-    let vi = get_input(Some(&file_path_in), &file_args);
+    let vi = get_input(file_path_in, &file_args);
     if vi.len() < 1 {
+        let input = match file_path_in {
+            Some(pb) => pb.to_string_lossy().into_owned(),
+            None => String::from("standard in"),
+        };
         return Err(::std::io::Error::new(ErrorKind::Other,
                                          format!("couldn't parse any input from {}.",
-                                                 file_path_in.display())))
+                                                 input)))
     }
 
-    let mut w = try!(write_factory(Some(&file_path_out)));
+    let mut w = try!(write_factory(file_path_out));
 
     for vw in fov {
         try!(vw.write(&mut w, &file_args.name, file_args.hex, &vi));
@@ -512,7 +516,7 @@ fn traverse_dir(base_input_dir: &PathBuf,
                     output_file_path.set_extension("rs");
                     println!("output_file_path = {}", output_file_path.display());
 
-                    try!(process(input_file_path, output_file_path, &args));
+                    try!(process(Some(&input_file_path), Some(&output_file_path), &args));
                 }
             }
         }
@@ -525,14 +529,6 @@ fn main() {
     env_logger::init().unwrap();
     let (args, file_args) = parse_options();
     debug!("args = {:?}", args);
-
-    let mut fov: Vec<Box<FormatOutput>> = Vec::new();
-    fov.push(Box::new(FormatOutputEnum));
-    if file_args.fromstr { fov.push(Box::new(FormatOutputFromStr)); }
-    if file_args.default { fov.push(Box::new(FormatOutputDefault)); }
-    if file_args.display { fov.push(Box::new(FormatOutputDisplay)); }
-    if file_args.fromprimative { fov.push(Box::new(FormatOutputFromPrimative)); }
-    if file_args.pretty_fmt { fov.push(Box::new(FormatOutputPrettyFmt)); }
 
     if args.input_dir.is_some() {
         let input_dir = PathBuf::from(args.input_dir.as_ref().unwrap());
@@ -554,12 +550,6 @@ fn main() {
             None => None,
         };
 
-        let vi = get_input(file_path_in_ref, &file_args);
-        if vi.len() < 1 {
-            println!("Error: couldn't parse any input. Try turning --define off/on.");
-            return;
-        }
-
         // TODO: revisit. Is there a better way to do this?
         let file_path_out = match args.output {
             Some(ref s) => Some(PathBuf::from(s)),
@@ -569,14 +559,11 @@ fn main() {
             Some(ref fp) => Some(fp),
             None => None,
         };
-        let mut w = write_factory(file_path_out_ref).unwrap();
 
-        for vw in fov {
-            match vw.write(&mut w, &file_args.name, file_args.hex, &vi)
-            {
-                Err(e) => println!("Error: {}", e),
-                _ => ()
-            }
+        match process(file_path_in_ref, file_path_out_ref, &file_args)
+        {
+            Err(e) => println!("Error: {}", e),
+            _ => ()
         }
     }
 }
