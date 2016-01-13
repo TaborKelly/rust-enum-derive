@@ -4,7 +4,7 @@ use std::env;
 use getopts::Options;
 use std::cmp::Ordering;
 use std::io::prelude::*;
-use std::io::{BufReader, BufWriter, Error, ErrorKind};
+use std::io::{BufReader, BufWriter, Error, ErrorKind, Result};
 use std::fs::{self, File, OpenOptions};
 use std::path::PathBuf;
 
@@ -41,7 +41,7 @@ impl Default for FileArgs {
     }
 }
 trait FormatOutput {
-    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> ::std::io::Result<()>;
+    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()>;
 }
 
 fn parse_options() -> (Args, FileArgs) {
@@ -199,7 +199,7 @@ fn get_input(file_path: Option<&PathBuf>, file_args: &FileArgs) -> Vec<CEnum> {
 
 struct FormatOutputFromPrimative;
 impl FormatOutput for FormatOutputFromPrimative {
-    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> ::std::io::Result<()> {
+    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
         try!(write!(w, "impl ::num::traits::FromPrimitive for {} {{\n", name));
         try!(write!(w, "    #[allow(dead_code)]\n"));
         try!(write!(w, "    fn from_i64(n: i64) -> Option<Self> {{\n"));
@@ -237,7 +237,7 @@ impl FormatOutput for FormatOutputFromPrimative {
 struct FormatOutputPrettyFmt;
 impl FormatOutput for FormatOutputPrettyFmt {
     #[allow(unused_variables)]
-    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> ::std::io::Result<()> {
+    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
         try!(write!(w, "impl {} {{\n", name));
         try!(write!(w, "    fn pretty_fmt(f: &mut ::std::fmt::Formatter, flags: u32) -> ::std::fmt::Result {{\n"));
         try!(write!(w, "        let mut shift: u32 = 0;\n"));
@@ -268,7 +268,7 @@ impl FormatOutput for FormatOutputPrettyFmt {
 struct FormatOutputDefault;
 impl FormatOutput for FormatOutputDefault {
     #[allow(unused_variables)]
-    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> ::std::io::Result<()> {
+    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
         try!(write!(w, "impl Default for {} {{\n", name));
         try!(write!(w, "    fn default() -> {} {{\n", name));
         try!(write!(w, "        {}::{}\n", name, vec[0].s));
@@ -281,7 +281,7 @@ impl FormatOutput for FormatOutputDefault {
 struct FormatOutputDisplay;
 impl FormatOutput for FormatOutputDisplay {
     #[allow(unused_variables)]
-    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> ::std::io::Result<()> {
+    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
         try!(write!(w, "impl ::std::fmt::Display for {} {{\n", name));
         try!(write!(w, "    #[allow(dead_code)]\n"));
         try!(write!(w, "    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {{\n"));
@@ -299,7 +299,7 @@ impl FormatOutput for FormatOutputDisplay {
 struct FormatOutputFromStr;
 impl FormatOutput for FormatOutputFromStr {
     #[allow(unused_variables)]
-    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> ::std::io::Result<()> {
+    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
         try!(write!(w, "impl ::std::str::FromStr for {} {{\n", name));
         try!(write!(w, "    type Err = ();\n"));
         try!(write!(w, "    #[allow(dead_code)]\n"));
@@ -318,7 +318,7 @@ impl FormatOutput for FormatOutputFromStr {
 
 struct FormatOutputEnum;
 impl FormatOutput for FormatOutputEnum {
-    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> ::std::io::Result<()> {
+    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
         try!(write!(w, "#[allow(dead_code, non_camel_case_types)]\n"));
         try!(write!(w, "pub enum {} {{\n", name));
 
@@ -336,7 +336,7 @@ impl FormatOutput for FormatOutputEnum {
     }
 }
 
-fn write_factory(file_path: Option<&PathBuf>) -> ::std::io::Result<Box<Write>> {
+fn write_factory(file_path: Option<&PathBuf>) -> Result<Box<Write>> {
     match file_path {
         Some(s) => {
             try!(std::fs::create_dir_all(s.parent().unwrap()));
@@ -391,7 +391,7 @@ macro_rules! get_key_bool {
     }
 }
 
-fn parse_toml(path: &PathBuf) -> ::std::io::Result<FileArgs>
+fn parse_toml(path: &PathBuf) -> Result<FileArgs>
 {
     let mut fa = FileArgs::default();
     let mut f = try!(File::open(&path));
@@ -432,7 +432,7 @@ fn parse_toml(path: &PathBuf) -> ::std::io::Result<FileArgs>
 }
 
 fn process(file_path_in: Option<&PathBuf>, file_path_out: Option<&PathBuf>,
-           file_args: &FileArgs) -> ::std::io::Result<()> {
+           file_args: &FileArgs) -> Result<()> {
     let mut fov: Vec<Box<FormatOutput>> = Vec::new();
     fov.push(Box::new(FormatOutputEnum));
     if file_args.fromstr { fov.push(Box::new(FormatOutputFromStr)); }
@@ -463,7 +463,7 @@ fn process(file_path_in: Option<&PathBuf>, file_path_out: Option<&PathBuf>,
 
 fn traverse_dir(base_input_dir: &PathBuf,
                 base_output_dir: &PathBuf,
-                sub_dir: &PathBuf) -> ::std::io::Result<()>{
+                sub_dir: &PathBuf) -> Result<()>{
     println!("traverse_dir('{}', '{}', '{}')", base_input_dir.display(),
               base_output_dir.display(), sub_dir.display());
 
