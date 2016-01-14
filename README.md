@@ -97,14 +97,14 @@ input/
     └── two.toml
 
 1 directory, 4 files
-e$ tree /tmp/output/
+$ tree /tmp/output/
 /tmp/output/
 ├── one.rs
 └── sub
     └── two.rs
 
 1 directory, 2 files
-e$ tree /tmp/output/
+$ tree /tmp/output/
 /tmp/output/
 ├── one.rs
 └── sub
