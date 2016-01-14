@@ -10,7 +10,11 @@ Usage: ./rust-enum-derive <options>
 A simple program for generating rust enums and associated traits from text files.
 Options:
     -i, --input NAME    input file name (stdin if not specified)
-    -o, --output NAME   output file name (stdout if not specified)
+        --input_dir NAME
+                        input directory to traverse
+    -o, --output NAME   output directory to traverse
+        --output_dir NAME
+                        output file name (stdout if not specified)
         --name NAME     the enum name (Name if not specified)
     -h, --help          print this help menu
         --define        parse C #define input instead of enum
@@ -28,19 +32,19 @@ Options:
 ## Simple examples
 All of the following examples produce the same code:
 
-```
+```c
 ZERO = 0,
 ONE = 1,
 TWO = 2,
 ```
 
-```
+```c
 ZERO,
 ONE,
 TWO,
 ```
 
-```
+```c
 #define ZERO 0
 #define ONE 1
 #define TWO 2
@@ -48,7 +52,7 @@ TWO,
 
 This is the rust enum that will result:
 
-```
+```rust
 pub enum Name {
     ZERO = 0,
     ONE = 1,
@@ -56,10 +60,63 @@ pub enum Name {
 }
 ```
 
+rust-enum-derive can take input from standard in, a file, or a directory full of files (and associated TOML configuration). In turn this output can be directed to standard out, a file, or a directory full of files.
+
+In the case of input from a directory structure it will look for TOML files (with filenames ending in ".toml" with the following structure:
+
+```toml
+[rust-enum-derive]
+name = "Name"
+define = false
+default = false
+display = false
+fromprimative = false
+fromstr = false
+pretty_fmt = false
+```
+
+The meaning of these fields matches their meaning on the command-line. You don't need to include any fields if you don't mean to change them from their default (false) value, however you do need to include a `[rust-enum-derive]` table. You will also need to include a file with the same name as your .toml file except ending in ".in". Your directory structure in your --input_dir will be replicated in your --output_dir. For example:
+
+```
+$ rust-enum-derive --input_dir ./input/ --output_dir /tmp/output--input_dir ./input/ --output_dir /tmp/output
+$ tree input/
+input/
+├── one.in
+├── one.toml
+└── sub
+    ├── two.in
+    └── two.toml
+
+1 directory, 4 files
+$ tree input/
+input/
+├── one.in
+├── one.toml
+└── sub
+    ├── two.in
+    └── two.toml
+
+1 directory, 4 files
+e$ tree /tmp/output/
+/tmp/output/
+├── one.rs
+└── sub
+    └── two.rs
+
+1 directory, 2 files
+e$ tree /tmp/output/
+/tmp/output/
+├── one.rs
+└── sub
+    └── two.rs
+
+1 directory, 2 files
+```
+
 ## Complex example
 For example, rust-enum-derive can take the following text file (linux/if.h):
 
-```
+```c
 enum net_device_flags {
 	IFF_UP				= 1<<0,  /* sysfs */
 	IFF_BROADCAST			= 1<<1,  /* __volatile__ */
@@ -393,5 +450,4 @@ impl Name {
 }
 ```
 
-You can choose to have rust-enum-derive implement all, some, or none of the
-methods/traits.
+You can choose to have rust-enum-derive implement all, some, or none of the methods/traits.
