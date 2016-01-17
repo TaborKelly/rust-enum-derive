@@ -24,7 +24,8 @@ struct Args {
 }
 #[derive(Debug)]
 struct FileArgs {
-    name: String,
+    name: Option<String>,
+    derive: Option<String>,
     define: bool,
     default: bool,
     display: bool,
@@ -36,8 +37,8 @@ struct FileArgs {
 impl Default for FileArgs {
     fn default() -> FileArgs
     {
-        FileArgs{ name: String::from("Name"), define: false, default: false, display: false,
-                  fromstr: false, fromprimative: false, hex: false, pretty_fmt: false }
+        FileArgs{ name: None, derive: None, define: false, default: false, display: false,
+                 fromstr: false, fromprimative: false, hex: false, pretty_fmt: false }
     }
 }
 trait FormatOutput {
@@ -56,6 +57,7 @@ fn parse_options() -> (Args, FileArgs) {
     opts.optopt("o", "output", "output directory to traverse", "NAME");
     opts.optopt("", "output_dir", "output file name (stdout if not specified)", "NAME");
     opts.optopt("", "name", "the enum name (Name if not specified)", "NAME");
+    opts.optopt("", "derive", "Which traits to derive. Ex: \"Debug, PartialEq\"", "DERIVE");
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("", "define", "parse C #define input instead of enum");
     opts.optflag("a", "all", "implement all of the traits (equivalent to \
@@ -79,9 +81,8 @@ fn parse_options() -> (Args, FileArgs) {
     a.input_dir = matches.opt_str("input_dir");
     a.output = matches.opt_str("o");
     a.output_dir = matches.opt_str("output_dir");
-    let name = matches.opt_str("name");
-    // apply default name
-    fa.name = name.unwrap_or(String::from("Name"));
+    fa.name = matches.opt_str("name");
+    fa.derive = matches.opt_str("derive");
     fa.define = matches.opt_present("define");
     fa.default = matches.opt_present("default");
     fa.display = matches.opt_present("display");
@@ -317,9 +318,14 @@ impl FormatOutput for FormatOutputFromStr {
 }
 
 struct FormatOutputEnum;
-impl FormatOutput for FormatOutputEnum {
-    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
+impl FormatOutputEnum {
+    fn write(&self, w: &mut Write, name: &String, derive: Option<&String>, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
         try!(write!(w, "#[allow(dead_code, non_camel_case_types)]\n"));
+        match derive
+        {
+            Some(s) => try!(write!(w, "#[derive({})]\n", s)),
+            None => (),
+        }
         try!(write!(w, "pub enum {} {{\n", name));
 
         for v in vec {
@@ -356,9 +362,8 @@ fn write_factory(file_path: Option<&PathBuf>) -> Result<Box<Write>> {
 
 // A macro to retrieve an str element from a toml::Table
 // $t - Table to lookup in
-// $a - FileArgs struct
-// $v - the value in the FileArgs struct that we are assigning to,
-//      also the name to look for in the toml
+// $a - Where to assign Some(String)
+// $v - the name to look for in the toml
 macro_rules! get_key_string {
     ($t:ident, $a:ident, $v:ident) => {
         if $t.contains_key(stringify!($v)) {
@@ -370,7 +375,7 @@ macro_rules! get_key_string {
                                               stringify!($v))))
             }
             let $v = $v.unwrap();
-            $a.$v = String::from($v);
+            $a.$v = Some(String::from($v));
         }
     }
 }
@@ -420,6 +425,7 @@ fn parse_toml(path: &PathBuf) -> Result<FileArgs>
     let rust_enum_derive = rust_enum_derive.unwrap();
 
     get_key_string!(rust_enum_derive, fa, name);
+    get_key_string!(rust_enum_derive, fa, derive);
     get_key_bool!(rust_enum_derive, fa, define);
     get_key_bool!(rust_enum_derive, fa, default);
     get_key_bool!(rust_enum_derive, fa, display);
@@ -427,6 +433,7 @@ fn parse_toml(path: &PathBuf) -> Result<FileArgs>
     get_key_bool!(rust_enum_derive, fa, fromprimative);
     get_key_bool!(rust_enum_derive, fa, hex);
     get_key_bool!(rust_enum_derive, fa, pretty_fmt);
+    println!("fa = {:?}", fa);
 
     Ok(fa)
 }
@@ -434,7 +441,6 @@ fn parse_toml(path: &PathBuf) -> Result<FileArgs>
 fn process(file_path_in: Option<&PathBuf>, file_path_out: Option<&PathBuf>,
            file_args: &FileArgs) -> Result<()> {
     let mut fov: Vec<Box<FormatOutput>> = Vec::new();
-    fov.push(Box::new(FormatOutputEnum));
     if file_args.fromstr { fov.push(Box::new(FormatOutputFromStr)); }
     if file_args.default { fov.push(Box::new(FormatOutputDefault)); }
     if file_args.display { fov.push(Box::new(FormatOutputDisplay)); }
@@ -453,9 +459,16 @@ fn process(file_path_in: Option<&PathBuf>, file_path_out: Option<&PathBuf>,
     }
 
     let mut w = try!(write_factory(file_path_out));
+    let name = match file_args.name
+    {
+        Some(ref s) => s.clone(),
+        None => String::from("Name"),
+    };
 
+    let derive = file_args.derive.as_ref();
+    try!(FormatOutputEnum.write(&mut w, &name, derive, file_args.hex, &vi));
     for vw in fov {
-        try!(vw.write(&mut w, &file_args.name, file_args.hex, &vi));
+        try!(vw.write(&mut w, &name, file_args.hex, &vi));
     }
 
     Ok(())

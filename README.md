@@ -16,6 +16,8 @@ Options:
         --output_dir NAME
                         output file name (stdout if not specified)
         --name NAME     the enum name (Name if not specified)
+        --derive DERIVE Which traits to derive. Ex: "Debug, PartialEq"
+
     -h, --help          print this help menu
         --define        parse C #define input instead of enum
     -a, --all           implement all of the traits (equivalent to --display
@@ -67,6 +69,7 @@ In the case of input from a directory structure it will look for TOML files (wit
 ```toml
 [rust-enum-derive]
 name = "Name"
+derive = "Debug, PartialEq"
 define = false
 default = false
 display = false
