@@ -540,7 +540,7 @@ fn main() {
         let output_dir = PathBuf::from(args.output_dir.as_ref().unwrap());
         match traverse_dir(&input_dir, &output_dir, &PathBuf::new())
         {
-            Err(e) => error!("{}", e),
+            Err(e) => panic!("{}", e),
             _ => ()
         }
     }
@@ -567,7 +567,7 @@ fn main() {
 
         match process(file_path_in_ref, file_path_out_ref, &file_args)
         {
-            Err(e) => error!("{}", e),
+            Err(e) => panic!("{}", e),
             _ => ()
         }
     }
