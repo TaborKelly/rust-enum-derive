@@ -103,17 +103,17 @@ fn parse_options() -> (Args, FileArgs) {
     }
 
     if a.input.is_some() && a.input_dir.is_some() {
-        println!("ERROR: using --input and --input_dir at the same time \
-                  doesn't make sense!");
+        error!("using --input and --input_dir at the same time doesn't make \
+               sense!");
         std::process::exit(1);
     }
     if a.output.is_some() && a.output_dir.is_some() {
-        println!("ERROR: using --output and --output_dir at the same time \
-                  doesn't make sense!");
+        error!("using --output and --output_dir at the same time  doesn't \
+               make sense!");
         std::process::exit(1);
     }
     if a.input_dir.is_some() && a.output_dir.is_none() {
-        println!("ERROR: if you use --input_dir you must use --output_dir!");
+        error!("if you use --input_dir you must use --output_dir!");
         std::process::exit(1);
     }
 
@@ -433,7 +433,7 @@ fn parse_toml(path: &PathBuf) -> Result<FileArgs>
     get_key_bool!(rust_enum_derive, fa, fromprimative);
     get_key_bool!(rust_enum_derive, fa, hex);
     get_key_bool!(rust_enum_derive, fa, pretty_fmt);
-    println!("fa = {:?}", fa);
+    debug!("fa = {:?}", fa);
 
     Ok(fa)
 }
@@ -540,7 +540,7 @@ fn main() {
         let output_dir = PathBuf::from(args.output_dir.as_ref().unwrap());
         match traverse_dir(&input_dir, &output_dir, &PathBuf::new())
         {
-            Err(e) => println!("Error: {}", e),
+            Err(e) => error!("{}", e),
             _ => ()
         }
     }
@@ -567,7 +567,7 @@ fn main() {
 
         match process(file_path_in_ref, file_path_out_ref, &file_args)
         {
-            Err(e) => println!("Error: {}", e),
+            Err(e) => error!("{}", e),
             _ => ()
         }
     }
