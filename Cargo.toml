@@ -1,5 +1,5 @@
 [package]
-name = "rust_enum_derive"
+name = "rust-enum-derive"
 version = "0.4.0"
 authors = ["Tabor Kelly <taborkelly+github@gmail.com>"]
 license = "Apache-2.0/BSD-3-Clause-Clear/MIT"
