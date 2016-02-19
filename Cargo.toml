@@ -5,6 +5,7 @@ authors = ["Tabor Kelly <taborkelly+github@gmail.com>"]
 license = "Apache-2.0/BSD-3-Clause-Clear/MIT"
 description = "A simple library (and program) for generating rust enums and associated traits from text files."
 homepage = "https://github.com/TaborKelly/rust-enum-derive"
+documentation = "https://taborkelly.github.io/rust-enum-derive/doc/rust_enum_derive/"
 
 [dependencies]
 getopts = "0.2"
