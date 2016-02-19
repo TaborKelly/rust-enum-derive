@@ -1,6 +1,6 @@
 [root]
-name = "rust-enum-derive"
-version = "0.3.2"
+name = "rust_enum_derive"
+version = "0.4.0"
 dependencies = [
  "env_logger 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,9 +1,9 @@
 [package]
-name = "rust-enum-derive"
-version = "0.3.3"
+name = "rust_enum_derive"
+version = "0.4.0"
 authors = ["Tabor Kelly <taborkelly+github@gmail.com>"]
 license = "Apache-2.0/BSD-3-Clause-Clear/MIT"
-description = "A simple program for generating rust enums and associated traits from text files."
+description = "A simple library (and program) for generating rust enums and associated traits from text files."
 homepage = "https://github.com/TaborKelly/rust-enum-derive"
 
 [dependencies]
@@ -12,3 +12,11 @@ log = "0.3.0"
 env_logger = "0.3.0"
 regex = "0.1.0"
 toml = "0.1"
+
+[[bin]]
+name = "rust_enum_derive"
+doc = false
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["rlib"]
