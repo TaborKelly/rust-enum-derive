@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["process","This is the function that you call to process one file (Enum) worth of data."],["traverse_dir","This is the function that you call to process a whole directory heirarcy full of files."]],"struct":[["FileArgs","Arguments for how to process() an input file."]]});
