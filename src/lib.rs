@@ -311,7 +311,7 @@ fn parse_toml(path: &PathBuf) -> Result<FileArgs>
 fn get_num(s: &str) -> i32 {
     use std::str::FromStr;
     use regex::Regex;
-    let re_int = Regex::new(r"^(0x)?([:digit:]+)$").unwrap();
+    let re_int = Regex::new(r"^(0x)?([:xdigit:]+)$").unwrap();
     let re_shift = Regex::new(r"^([:digit:]+)[:space:]*<<[:space:]*([:digit:]+)$").unwrap();
 
     if re_int.is_match(s) {
@@ -561,4 +561,35 @@ fn test_parse_buff_enum() {
     assert!(v[3].i == 19); assert!(v[3].s == "RTM_SETLINK");
     assert!(v[4].i == 20); assert!(v[4].s == "RTM_NEWADDR");
     assert!(v[5].i == 21); assert!(v[5].s == "RTM_DELADDR");
+}
+
+#[test]
+fn test_parse_buff_hex() {
+    use std::io::Cursor;
+    let s = "ten    = 0xa,\n\
+    eleven = 0xb,\n\
+    twelve = 12,";
+
+    let buff = Cursor::new(s.as_bytes());
+    let v = parse_buff(buff, true);
+
+    assert!(v[0].i == 10); assert!(v[0].s == "ten");
+    assert!(v[1].i == 11); assert!(v[1].s == "eleven");
+    assert!(v[2].i == 12); assert!(v[2].s == "twelve");
+}
+
+#[test]
+#[should_panic]
+fn test_parse_buff_not_hex() {
+    use std::io::Cursor;
+    let s = "ten    = 10,\n\
+    eleven = 11,\n\
+    twelve = 12abc,"; // <-- not valid for base 10
+
+    let buff = Cursor::new(s.as_bytes());
+    let v = parse_buff(buff, true);
+
+    assert!(v[0].i == 10); assert!(v[0].s == "ten");
+    assert!(v[1].i == 11); assert!(v[1].s == "eleven");
+    assert!(v[2].i == 12); assert!(v[2].s == "twelve");
 }
