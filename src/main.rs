@@ -40,7 +40,7 @@ fn parse_options() -> (Args, FileArgs) {
     opts.optflag("", "default", "implement the Default trait with the first \
                  value");
     opts.optflag("", "display", "implement the std::fmt::Display trait");
-    opts.optflag("", "fromprimative", "implement the num::traits::FromPrimitive trait");
+    opts.optflag("", "fromprimative", "use the enum_primitive crate to get from_primative trait");
     opts.optflag("", "fromstr", "implement the std::str::FromStr trait");
     opts.optflag("", "hex", "hexadecimal output");
     opts.optflag("", "pretty_fmt", "implement pretty_fmt()");

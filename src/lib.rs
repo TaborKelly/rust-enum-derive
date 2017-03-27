@@ -86,43 +86,6 @@ trait FormatOutput {
     fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()>;
 }
 
-struct FormatOutputFromPrimative;
-impl FormatOutput for FormatOutputFromPrimative {
-    fn write(&self, w: &mut Write, name: &String, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
-        try!(write!(w, "impl ::num::traits::FromPrimitive for {} {{\n", name));
-        try!(write!(w, "    #[allow(dead_code)]\n"));
-        try!(write!(w, "    fn from_i64(n: i64) -> Option<Self> {{\n"));
-        try!(write!(w, "        match n {{\n"));
-        for v in vec {
-            if hex {
-                try!(write!(w, "            0x{:X} => Some({}::{}),\n", v.i, name, v.s));
-            }
-            else {
-                try!(write!(w, "            {} => Some({}::{}),\n", v.i, name, v.s));
-            }
-        }
-        try!(write!(w, "            _ => None\n"));
-        try!(write!(w, "        }}\n"));
-        try!(write!(w, "    }}\n"));
-        try!(write!(w, "    #[allow(dead_code)]\n"));
-        try!(write!(w, "    fn from_u64(n: u64) -> Option<Self> {{\n"));
-        try!(write!(w, "        match n {{\n"));
-        for v in vec {
-            if hex {
-                try!(write!(w, "            0x{:X} => Some({}::{}),\n", v.i, name, v.s));
-            }
-            else {
-                try!(write!(w, "            {} => Some({}::{}),\n", v.i, name, v.s));
-            }
-        }
-        try!(write!(w, "            _ => None\n"));
-        try!(write!(w, "        }}\n"));
-        try!(write!(w, "    }}\n"));
-        try!(write!(w, "}}\n"));
-        Ok(())
-    }
-}
-
 struct FormatOutputPrettyFmt;
 impl FormatOutput for FormatOutputPrettyFmt {
     #[allow(unused_variables)]
@@ -207,7 +170,10 @@ impl FormatOutput for FormatOutputFromStr {
 
 struct FormatOutputEnum;
 impl FormatOutputEnum {
-    fn write(&self, w: &mut Write, name: &String, derive: Option<&String>, hex: bool, vec: &Vec<CEnum>) -> Result<()> {
+    fn write(&self, w: &mut Write, name: &String, derive: Option<&String>, hex: bool, efp: bool, vec: &Vec<CEnum>) -> Result<()> {
+        if efp {
+            try!(write!(w, "enum_from_primitive! {{\n"));
+        }
         try!(write!(w, "#[allow(dead_code, non_camel_case_types)]\n"));
         match derive
         {
@@ -226,6 +192,9 @@ impl FormatOutputEnum {
         }
 
         try!(write!(w, "}}\n"));
+        if efp {
+            try!(write!(w, "}}\n"));
+        }
         Ok(())
     }
 }
@@ -407,7 +376,6 @@ pub fn process(file_path_in: Option<&PathBuf>, file_path_out: Option<&PathBuf>,
     if file_args.fromstr { fov.push(Box::new(FormatOutputFromStr)); }
     if file_args.default { fov.push(Box::new(FormatOutputDefault)); }
     if file_args.display { fov.push(Box::new(FormatOutputDisplay)); }
-    if file_args.fromprimative { fov.push(Box::new(FormatOutputFromPrimative)); }
     if file_args.pretty_fmt { fov.push(Box::new(FormatOutputPrettyFmt)); }
 
     let vi = get_input(file_path_in, &file_args);
@@ -429,7 +397,7 @@ pub fn process(file_path_in: Option<&PathBuf>, file_path_out: Option<&PathBuf>,
     };
 
     let derive = file_args.derive.as_ref();
-    try!(FormatOutputEnum.write(&mut w, &name, derive, file_args.hex, &vi));
+    try!(FormatOutputEnum.write(&mut w, &name, derive, file_args.hex, file_args.fromprimative, &vi));
     for vw in fov {
         try!(vw.write(&mut w, &name, file_args.hex, &vi));
     }
